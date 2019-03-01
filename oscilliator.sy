@@ -1,0 +1,8 @@
+4 2
+k_1 0.02
+k_p 6
+k_m 20
+V_im 0.36 
+ATP 2*k_1*G*ATP-(k_p*ATP)/(ATP+k_m) 4
+G V_im-k_1*G*ATP 3
+1 1000 10000

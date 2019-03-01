@@ -1,0 +1,6 @@
+X yra organizmų biomasės koncentracija. 
+S yra substratas, maistas tiems organizmams.
+S_in yra pradinė substrato koncentracija
+f_1, f_2 ir f_3 yra nuo substrato priklausomi biomasės augimo indeksai (greitis) priklausomas nuo substrato (arba substratų)
+D yra mažinimo/silpninimo/slopinimo indeksas (kaip suprantu parodo substrato/organizmo sugedimą) arba maisto medžiagų apsikeitimas
+
