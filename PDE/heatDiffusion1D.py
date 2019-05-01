@@ -19,6 +19,9 @@ def forX(x):
 def calcTimeStep(dx, D):
 	return 0.5*dx**2/D
 
+def calcTimeStep2D(dx,dy,D):
+	return ((dx**2)*(dy**2))/(2*D*((dx**2)+(dy**2)))
+
 def internalHeatSource(x, sourceExists):
 	return 2*sourceExists
 
@@ -170,7 +173,7 @@ def FTCSexample(leftBoundary, rightBoundary, finalTime, length = 1, numberOfNode
 	plt.show()
 
 
-def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, leftBoundaryX, leftBoundaryY, rightBoundaryX, rightBoundaryY, thermalConst, finalTime, timeStep):
+def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, leftBoundaryX, leftBoundaryY, rightBoundaryX, rightBoundaryY, thermalConst, finalTime):
 	#Getting the parameters
 	Lx = lengthX
 	Ly = lengthY
@@ -181,65 +184,76 @@ def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, l
 	T1Sy = leftBoundaryY
 	T2Sx = rightBoundaryX
 	T2Sy = rightBoundaryY
-	dx = Lx/nx
-	dy = Ly/ny
+	dx = float(Lx)/float(nx)
+	dy = float(Ly)/float(ny)
 	x = np.linspace(dx/2, Lx-dx/2, nx)
 	y = np.linspace(dy/2, Ly-dy/2, ny)
 	X,Y = np.meshgrid(x,y)
 	t_final = finalTime
-	dt = timeStep
 	alpha = thermalConst
+
+	#Calculating suitable dt
+	dt = calcTimeStep2D(dx, dy, float(alpha))
+	
 	
 	#Finding minimum and maximum values of temperature
-	#They're either in initVector or one boundaries
-	tMin = min(initVector)
+	#They're either in initMatrix or one boundaries
+	tMin = initMatrix[0][0]
+	for i in initMatrix:
+		tMin = tMin if tMin < min(i) else min(i)
 	tMin = tMin if tMin < leftBoundaryX else leftBoundaryX
 	tMin = tMin if tMin < rightBoundaryX else rightBoundaryX
 	tMin = tMin if tMin < leftBoundaryY else leftBoundaryY
 	tMin = tMin if tMin < rightBoundaryY else rightBoundaryY
 
-	tMax = max(initVector)
+	tMax = initMatrix[0][0]
+	for i in initMatrix:
+		tMax = tMax if tMax > max(i) else max(i)
 	tMax = tMax if tMax > leftBoundaryX else leftBoundaryX
 	tMax = tMax if tMax > rightBoundaryX else rightBoundaryX
 	tMax = tMax if tMax > leftBoundaryY else leftBoundaryY
 	tMax = tMax if tMax > rightBoundaryY else rightBoundaryY
 
 	t = np.arange(0, t_final, dt)
-	dTdt = np.empty(nx, ny)
-	temperature = []
+	dTdt = np.empty((nx, ny))
 
 	#Running the simulation
 	for j in range(1,len(t)):
+		temperature = []
 		for i in range(1,nx-1):
 			for k in range(1, ny-1):
-				dTdt[i][j] = alpha*((-(T[i][k]-T[i-1][k])/dx**2+(T[i+1][k]-T[i][k])/dx**2)+(-(T[i][k]-T[i][k-1])/dy**2+(T[i][k+1]-T[i][k])/dy**2))
+				#Inner square
+				dTdt[i][k] = alpha*((-(T[i][k]-T[i-1][k])/dx**2+(T[i+1][k]-T[i][k])/dx**2)+(-(T[i][k]-T[i][k-1])/dy**2+(T[i][k+1]-T[i][k])/dy**2))
+			#Left and right borders
 			dTdt[i][0] = alpha*((-(T[i][0]-T[i-1][0])/dx**2+(T[i+1][0]-T[i][0])/dx**2)+(-(T[i][0]-leftBoundaryY)/dy**2+(T[i][1]-T[i][0])/dy**2))
 			dTdt[i][ny-1] = alpha*((-(T[i][ny-1]-T[i-1][ny-1])/dx**2+(T[i+1][ny-1]-T[i][ny-1])/dx**2)+(-(T[i][ny-1]-T[i][ny-2])/dy**2+(rightBoundaryY-T[i][ny-1])/dy**2))
 
 		for y in range(1, ny-1):
+			#Top and bottom borders
 			dTdt[0][y] = alpha*((-(T[0][y]-leftBoundaryX)/dx**2+(T[1][y]-T[0][y])/dx**2)+(-(T[0][y]-T[0][y-1])/dy**2+(T[0][y+1]-T[0][y])/dy**2))
-			dTdt[nx-1][y] = alpha*((-(T[nx-1][y]-T[nx-2][y])/dx**2+(rightBoundaryX-T[n-1][y])/dx**2)+(-(T[n-1][y]-T[n-1][y-1])/dy**2+(T[n-1][y+1]-T[n-1][y])/dy**2))
-
+			dTdt[nx-1][y] = alpha*((-(T[nx-1][y]-T[nx-2][y])/dx**2+(rightBoundaryX-T[nx-1][y])/dx**2)+(-(T[nx-1][y]-T[nx-1][y-1])/dy**2+(T[nx-1][y+1]-T[nx-1][y])/dy**2))
+			
+			#Corners
 			dTdt[0][0] = alpha*((-(T[0][0]-leftBoundaryX)/dx**2+(T[1][0]-T[0][0])/dx**2)+(-(T[0][0]-leftBoundaryY)/dy**2+(T[0][1]-T[0][0])/dy**2))
 			dTdt[nx-1][0] = alpha*((-(T[nx-1][0]-T[nx-2][0])/dx**2+(rightBoundaryX-T[nx-1][0])/dx**2)+(-(T[nx-1][0]-leftBoundaryY)/dy**2+(T[nx-1][1]-T[nx-1][0])/dy**2))
 			dTdt[0][ny-1] = alpha*((-(T[0][ny-1]-rightBoundaryX)/dx**2+(T[1][ny-1]-T[0][ny-1])/dx**2)+(-(T[0][ny-1]-T[0][ny-2])/dy**2+(rightBoundaryY-T[0][ny-1])/dy**2))
 			dTdt[nx-1][ny-1] = alpha*((-(T[nx-1][ny-1]-T[nx-2][ny-1])/dx**2+(leftBoundaryX-T[nx-1][ny-1])/dx**2)+(-(T[nx-1][ny-1]-T[nx-1][ny-2])/dy**2+(leftBoundaryY-T[nx-1][ny-1])/dy**2))
 
-		T += dTdt*dt
-		temperature.append(T.tolist())
-		#Laiko ciklas
-		#Cia daryti atvaizdavima
-	
-	#Plotting the simulation to heatmap
-	fig, ax = plt.subplots()
-	c = ax.pcolormesh(x, t, temperature, cmap='RdBu_r', vmin=tMin, vmax=tMax)
-	ax.set_title('1D heat diffusion')
-	ax.axis([dx/2, L-dx/2, 0, t_final])
-	fig.colorbar(c, ax=ax)
-	
-	plt.show()
+		T = np.add(T, dTdt*dt)
+		#temperature = T.tolist()
+		print T
+		#Plotting the simulation to heatmap
+		fig, ax = plt.subplots()
+		c = ax.pcolormesh(X,Y, T, cmap='RdBu_r', vmin=tMin, vmax=tMax)
+		ax.set_title('2D heat diffusion')
+		ax.axis([dx/2, Lx-dx/2, dy/2, Ly-dy/2])
+		fig.colorbar(c, ax=ax)
+		
+		outputName = '2D_outputs/output'+"{:05d}".format(j)+'.jpg'
+		plt.savefig(outputName, bbox_inches='tight')
 			
 
 #finiteVolumeMethod(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
 
-FTCSexample(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
+#FTCSexample(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
+FTCSmethod2D(length, length, numberOfNodes, numberOfNodes, np.zeros((numberOfNodes, numberOfNodes)), leftBoundary, leftBoundary, leftBoundary, leftBoundary, 0.1, finalTime)
