@@ -241,19 +241,20 @@ def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, l
 
 		T = np.add(T, dTdt*dt)
 		#temperature = T.tolist()
-		print T
 		#Plotting the simulation to heatmap
-		fig, ax = plt.subplots()
-		c = ax.pcolormesh(X,Y, T, cmap='RdBu_r', vmin=tMin, vmax=tMax)
-		ax.set_title('2D heat diffusion')
-		ax.axis([dx/2, Lx-dx/2, dy/2, Ly-dy/2])
-		fig.colorbar(c, ax=ax)
+		if j % 10:
+			fig, ax = plt.subplots()
+			c = ax.pcolormesh(X,Y, T, cmap='RdBu_r', vmin=tMin, vmax=tMax)
+			ax.set_title('2D heat diffusion')
+			ax.axis([dx/2, Lx-dx/2, dy/2, Ly-dy/2])
+			fig.colorbar(c, ax=ax)
 		
-		outputName = '2D_outputs/output'+"{:05d}".format(j)+'.jpg'
-		plt.savefig(outputName, bbox_inches='tight')
+			outputName = '2D_outputs/output'+"{:05d}".format(j)+'.jpg'
+			plt.savefig(outputName, bbox_inches='tight')
+			plt.close()
 			
 
 #finiteVolumeMethod(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
 
 #FTCSexample(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
-FTCSmethod2D(length, length, numberOfNodes, numberOfNodes, np.zeros((numberOfNodes, numberOfNodes)), leftBoundary, leftBoundary, leftBoundary, leftBoundary, 0.1, finalTime)
+FTCSmethod2D(length, length, numberOfNodes, numberOfNodes, np.zeros((numberOfNodes, numberOfNodes)), leftBoundary, leftBoundary, leftBoundary, leftBoundary, 0.001, finalTime)
