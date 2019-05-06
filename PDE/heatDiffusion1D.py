@@ -253,8 +253,73 @@ def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, l
 			plt.savefig(outputName, bbox_inches='tight')
 			plt.close()
 			
+def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, thermalConst, finalTime):
+	#Getting the parameters
+	n = numberOfNodes
+	T = initMatrix
+	TS = boundary
+	dR = float(R)/float(n)
+	rad = np.linspace(dR/2, R-dR/2, n)
+	azm = np.linspace(0, 2*np.pi, numberOfSegments)
+	r, th = np.meshgrid(rad, azm)
+	t_final = finalTime
+	alpha = thermalConst
+	dPhi = (2*np.pi)/numberOfSegments
 
+	#Calculating suitable dt
+	dt = calcTimeStep2D(dR, dPhi, float(alpha))
+	
+	
+	#Finding minimum and maximum values of temperature
+	#They're either in initMatrix or boundary
+	tMin = initMatrix[0][0]
+	for i in initMatrix:
+		tMin = tMin if tMin < min(i) else min(i)
+	tMin = tMin if tMin < boundary else boundary
+
+	tMax = initMatrix[0][0]
+	for i in initMatrix:
+		tMax = tMax if tMax > max(i) else max(i)
+	tMax = tMax if tMax > boundary else boundary
+
+	t = np.arange(0, t_final, dt)
+	dTdt = np.empty((numberOfSegments, n))
+
+	#Running the simulation
+	for j in range(1,len(t)):
+		temperature = []
+		for i in range(0,numberOfSegments-1):
+			symNode = T[(i+numberOfSegments/2)%numberOfSegments][0]
+			for k in range(1, n-1):
+				#Inner part of the slice
+				dTdt[i][k] = alpha*((-(T[i][k]-T[(i-1)%n][k])/dPhi**2+(T[(i+1)%n][k]-T[i][k])/dPhi**2)+(-(T[i][k]-T[i][k-1])/dR**2+(T[i][k+1]-T[i][k])/dR**2))
+			#Wide and narrow ends of the slice
+			#Narrow end of slice takes values from symmetrical slice narrow end 			
+			dTdt[i][0] = alpha*((-(T[i][0]-T[i-1][0])/dPhi**2+(T[i+1][0]-T[i][0])/dPhi**2)+(-(T[i][0]-symNode)/dR**2+(T[i][1]-T[i][0])/dR**2))
+			#Wide end of slice takes values from boundary
+			dTdt[i][n-1] = alpha*((-(T[i][n-1]-T[i-1][n-1])/dPhi**2+(T[i+1][n-1]-T[i][n-1])/dPhi**2)+(-(T[i][n-1]-T[i][n-2])/dR**2+(boundary-T[i][n-1])/dPhi**2))
+
+
+		T = np.add(T, dTdt*dt)
+		#temperature = T.tolist()
+		#Plotting the simulation to heatmap
+		if j % 10:
+			plt.subplot(projection="polar")
+			plt.pcolormesh(th,r,T)
+			plt.plot(azm,r,color='k',ls='none')
+			plt.show()
+			#fig, ax = plt.subplots()
+			#c = ax.pcolormesh(X,Y, T, cmap='RdBu_r', vmin=tMin, vmax=tMax)
+			#ax.set_title('2D heat diffusion')
+			#ax.axis([dx/2, Lx-dx/2, dy/2, Ly-dy/2])
+			#fig.colorbar(c, ax=ax)
+		
+			#outputName = '2D_outputs/output'+"{:05d}".format(j)+'.jpg'
+			#plt.savefig(outputName, bbox_inches='tight')
+			#plt.close()
+			
 #finiteVolumeMethod(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
 
 #FTCSexample(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
-FTCSmethod2D(length, length, numberOfNodes, numberOfNodes, np.zeros((numberOfNodes, numberOfNodes)), leftBoundary, leftBoundary, leftBoundary, leftBoundary, 0.001, finalTime)
+#FTCSmethod2D(length, length, numberOfNodes, numberOfNodes, np.zeros((numberOfNodes, numberOfNodes)), leftBoundary, leftBoundary, leftBoundary, leftBoundary, 0.001, finalTime)
+FTCSmethod2DPolar(length, numberOfNodes, numberOfNodes, np.zeros((numberOfNodes, numberOfNodes)), leftBoundary, 0.1, finalTime)
