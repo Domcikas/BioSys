@@ -279,6 +279,9 @@ def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, l
 			plt.savefig(outputName, bbox_inches='tight')
 			plt.close()
 			
+#########################################################################################################
+################################ POLAR MODEL ############################################################
+#########################################################################################################
 def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, thermalConst, finalTime):
 	#Getting the parameters
 	n = numberOfNodes
@@ -288,18 +291,23 @@ def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, 
 	#Temperature flow / chemical intake
 	TS = boundary
 	#Chemical #2 initialization
-	Ch2 = np.zeros((nS,n+1))
+	A = applyToMatrix(np.zeros((nS,n+1)))
+	P = np.zeros((nS,n+1))
 	dR = float(R)/float(n)
 	#rad = np.linspace(dR/2, R-dR/2, n)
 	rad = np.linspace(0, R, n+1)
 	azm = np.linspace(0, 2*np.pi, nS)
 	r, th = np.meshgrid(rad, azm)
 	t_final = finalTime
-	alpha = thermalConst
+	D_T = thermalConst
 	dPhi = (2*np.pi)/numberOfSegments
 
 	#Calculating suitable dt
-	dt = calcTimeStepPolar(R, nS, n, float(alpha))
+	dt = calcTimeStepPolar(R, nS, n, float(D_T))
+
+	#Reaction parameters
+	k_cat = 2.2
+	K_M = 0.052
 	
 	
 	#Finding minimum and maximum values of temperature
@@ -317,58 +325,109 @@ def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, 
 
 	t = np.arange(0, t_final, dt)
 	dTdt = np.empty((nS, n+1))
+	dAdt = np.empty((nS, n+1))
+	dPdt = np.empty((nS, n+1))
 
 	#Running the simulation
 	for j in range(0,len(t)):
 		for i in range(0,nS):
 			symNode = T[(i+numberOfSegments/2)%numberOfSegments][0]
 			for k in range(1, n):
-###################################################################
-			#TEMPERATURE / CHEMICAL #1 DIFFUSION
-###################################################################
 				#Inner part of the slice
-				dTdt[i][k] = alpha*(((T[(i+1)%nS][k]-2*T[i][k]+T[(i-1)%nS][k])/((dPhi**2)*(k*dR)**2))+((T[i][k+1]-2*T[i][k]+T[i][k-1])/dR**2)+((T[i][k+1]-T[i][k-1])/(2*dPhi*k*dR))) #dTdt = alpha*((d^2 T/d^2 phi * r^2)+(d^2 T/d^2 r)+(dT/dr * r))
+###################################################################
+				#TEMPERATURE / CHEMICAL T DIFFUSION
+###################################################################
+				dTdt[i][k] = D_T*(((T[(i+1)%nS][k]-2*T[i][k]+T[(i-1)%nS][k])/((dPhi**2)*(k*dR)**2))+((T[i][k+1]-2*T[i][k]+T[i][k-1])/dR**2)+((T[i][k+1]-T[i][k-1])/(2*dPhi*k*dR)))
+				#Reaction modifier
+				dTdt[i][k] += ((-k_cat*A[i][k]*T[i][k])/(K_M+T[i][k]))
+###################################################################
+				#CHEMICAL A DIFFUSSION 
+###################################################################
+				dAdt[i][k] = D_T*(((A[(i+1)%nS][k]-2*A[i][k]+A[(i-1)%nS][k])/((dPhi**2)*(k*dR)**2))+((A[i][k+1]-2*A[i][k]+A[i][k-1])/dR**2)+((A[i][k+1]-A[i][k-1])/(2*dPhi*k*dR)))
+				#Reaction modifier
+				dAdt[i][k] += 0#((-k_cat*T[i][k]*A[i][k])/(K_M+A[i][k]))
+###################################################################
+				#PRODUCT P DIFFUSSION 
+###################################################################
+				dPdt[i][k] = D_T*(((P[(i+1)%nS][k]-2*P[i][k]+P[(i-1)%nS][k])/((dPhi**2)*(k*dR)**2))+((P[i][k+1]-2*P[i][k]+P[i][k-1])/dR**2)+((P[i][k+1]-P[i][k-1])/(2*dPhi*k*dR)))
+				#Reaction modifier
+				dPdt[i][k] += ((k_cat*A[i][k]*T[i][k])/(K_M+T[i][k]))
 			#Wide and narrow ends of the slice
 			#Zero point end of slice takes values from points in + directions 			
-			#dTdt[i][0] = alpha*((-(T[i][0]-T[(i-1)%n][0])/dPhi**2+(T[(i+1)%n][0]-T[i][0])/dPhi**2)+(-(T[i][0]-symNode)/dR**2+(T[i][1]-T[i][0])/dR**2))
-			#dTdt[i][0] =  alpha*(((T[(i+1)%n][1]-2*T[i][0]+T[(i-1)%n][0])/((dPhi**2)*(k*dR)**2))+((T[i][k+1]-2*T[i][k]+T[i][k-1])/dR**2))
 			#Angles:
 			#90 degrees - nS/4
 			#180 degrees - nS/2
 			#270 degrees - 3*nS/2
-			dTdt[i][0] = alpha*((T[0][1]-4*T[i][0]+T[nS/4][1]+T[nS/2][1]+T[3*nS/4][1])/dR**2)
+			#Temperature/Chemical T
+			dTdt[i][0] = D_T*((T[0][1]-4*T[i][0]+T[nS/4][1]+T[nS/2][1]+T[3*nS/4][1])/dR**2)
+			#Reaction modifier
+			dTdt[i][0] += ((-k_cat*A[i][k]*T[i][k])/(K_M+T[i][k]))
+			#Chemical A
+			dAdt[i][0] = D_T*((A[0][1]-4*A[i][0]+A[nS/4][1]+A[nS/2][1]+A[3*nS/4][1])/dR**2)
+			#Reaction modifier
+			dAdt[i][0] += 0#((-k_cat*T[i][k]*A[i][k])/(K_M+A[i][k]))
+			#Product P
+			dPdt[i][0] = D_T*((P[0][1]-4*P[i][0]+P[nS/4][1]+P[nS/2][1]+P[3*nS/4][1])/dR**2)
 			#Boundary end of slice takes values from boundary
-			#Dirichlet boundary
-			bound = 2
+			#Dirichlet boundaries
+			boundT = 2
+			boundA = 0
+			boundP = 0
 			#Sine boundary
 			#bound = 20*sin(2*np.pi*(float(i)/float(nS-1)))
 			#Neumann boundary
 			#bound = (boundary/alpha-(T[(i+1)%n][n]-2*T[i][n]+T[(i-1)%n][n])/dPhi**2)*dR**2+2*T[i][n]+T[i][n-1]
-			#print bound
-			dTdt[i][n] = alpha*(((T[(i+1)%nS][n]-2*T[i][n]+T[(i-1)%nS][n])/((dPhi**2)*(n*dR)**2))+((bound-2*T[i][n]+T[i][n-1])/dR**2)+((bound-T[i][n-1])/(2*dPhi*n*dR)))
-#######################################################################################
-			#CHEMICAL #2 DIFFUSSION 
-#######################################################################################
+			#Boundary point end of slice takes values from boundary
+			#Temperature / Chemical T
+			dTdt[i][n] = D_T*(((T[(i+1)%nS][n]-2*T[i][n]+T[(i-1)%nS][n])/((dPhi**2)*(n*dR)**2))+((boundT-2*T[i][n]+T[i][n-1])/dR**2)+((boundT-T[i][n-1])/(2*dPhi*n*dR)))
+			#Reaction modifier
+			dTdt[i][n] += ((-k_cat*A[i][k]*T[i][k])/(K_M+T[i][k]))
+			#Chemical A
+			dAdt[i][n] = D_T*(((A[(i+1)%nS][n]-2*A[i][n]+A[(i-1)%nS][n])/((dPhi**2)*(n*dR)**2))+((boundA-2*A[i][n]+A[i][n-1])/dR**2)+((boundA-A[i][n-1])/(2*dPhi*n*dR)))
+			#Reaction modifier
+			dAdt[i][n] += 0#((-k_cat*T[i][k]*A[i][k])/(K_M+A[i][k]))
+			#Product P
+			dPdt[i][n] = D_T*(((P[(i+1)%nS][n]-2*P[i][n]+P[(i-1)%nS][n])/((dPhi**2)*(n*dR)**2))+((boundP-2*P[i][n]+P[i][n-1])/dR**2)+((boundP-P[i][n-1])/(2*dPhi*n*dR)))
+			#Reaction modifier
+			dPdt[i][n] += ((k_cat*A[i][k]*T[i][k])/(K_M+T[i][k]))
 			
+		#Changes to temperature / chemical 1
 		T = np.add(T, dTdt*dt)
+		#Changes to chemical 2
+		A = np.add(A, dAdt*dt)
+		#Changes to product
+		P = np.add(P, dPdt*dt)
 		#Plotting the simulation to heatmap
-		if j >= len(t)-3:
-			print T
+		if (j >= int(len(t))/2 -3 and j <= int(len(t))/2+3) or j >= len(t)-3:
+			#if j > 10:
+			#	return 0
+			#Plot Temperature / Chemical T
 			plt.subplot(projection="polar")
 			c = plt.pcolormesh(th,r,T,vmin=tMin, vmax=tMax)
-			print tMin
-			print tMax
 			plt.plot(azm,r,color='k',ls='none')
 			plt.colorbar(c)
-			#plt.thetagrids([theta * 15 for theta in range(360//15)])
+			plt.title("Chemical T", loc="left")
 			#plt.grid()
 			plt.show()
-			#fig, ax = plt.subplots()
-			#c = ax.pcolormesh(X,Y, T, cmap='RdBu_r', vmin=tMin, vmax=tMax)
-			#ax.set_title('2D heat diffusion')
-			#ax.axis([dx/2, Lx-dx/2, dy/2, Ly-dy/2])
 			
+			#Plot Chemical A
+			plt.subplot(projection="polar")
+			c = plt.pcolormesh(th,r,A, vmin=0, vmax=10)
+			plt.plot(azm,r,color='k',ls='none')
+			plt.colorbar(c)
+			plt.title("Chemical A", loc="left")
+			#plt.grid()
+			plt.show()
 		
+			#Plot Product P
+			plt.subplot(projection="polar")
+			c = plt.pcolormesh(th,r,P,vmin=0, vmax=3)
+			plt.plot(azm,r,color='k',ls='none')
+			plt.colorbar(c)
+			plt.title("Product P", loc="left")
+			#plt.grid()
+			plt.show()	
+			
 			#outputName = '2D_outputs/output'+"{:05d}".format(j)+'.jpg'
 			#plt.savefig(outputName, bbox_inches='tight')
 			#plt.close()
@@ -377,14 +436,17 @@ def initFunction1(r):
 	return np.e**(-(r**2)*10)
 
 
+def applyToMatrix(matrix):
+	ret = matrix
+	for i in range(0,numberOfNodes):
+		for j in range(0, numberOfNodes+1):
+			ret[i][j] = 100 if j == 0 else 0
+			#initFunction1(length*j/numberOfNodes)
+	return ret
+
 #finiteVolumeMethod(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
 #FTCSexample(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
 #FTCSmethod2D(length, length, numberOfNodes, numberOfNodes, np.zeros((numberOfNodes, numberOfNodes)), leftBoundary, leftBoundary, leftBoundary, leftBoundary, 0.001, finalTime)
 
 test = np.zeros((numberOfNodes, numberOfNodes+1))
-#for i in range(0,numberOfNodes):
-#	for j in range(0, numberOfNodes+1):
-#		test[i][j] = 10 if j == 0 else 0#initFunction1(length*j/numberOfNodes) 
-#test = np.zeros((numberOfNodes, numberOfNodes+1))
-print test
 FTCSmethod2DPolar(length, numberOfNodes, numberOfNodes, test, leftBoundary, 0.01, finalTime)
