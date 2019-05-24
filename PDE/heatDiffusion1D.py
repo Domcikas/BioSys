@@ -66,8 +66,27 @@ def integrateCartesian(matrix, dx, dy):
 	summ = 0
 	for i in matrix:
 		for j in i:
-			summ += j#*(dx*dy)
+			summ += j*(dx*dy)
 	return summ
+
+def integratePolar(matrix, dr, nphi):
+	summ = 0
+	summ += matrix[0][0]*np.pi*(dr/2)**2
+	for i in matrix:
+		for j in range(1,len(i)-1):
+			S = (np.pi*(j*dr+dr/2)**2-np.pi*(j*dr-dr/2)**2)/nphi
+			summ += i[j]*S
+		S = (np.pi*(j*dr)**2-np.pi*(j*dr-dr/2)**2)/nphi
+		summ += i[-1]*S
+	return summ
+
+def calculateS(index, dr, nphi, nr):
+	if index == 0:
+		return np.pi*(dr/2)**2
+	if index == nr:
+		return (np.pi*(index*dr)**2-np.pi*(index*dr-dr/2)**2)/nphi
+	else:
+		return (np.pi*(index*dr+dr/2)**2-np.pi*(index*dr-dr/2)**2)/nphi
 
 def finiteVolumeMethod(leftBoundary, rightBoundary, finalTime, length = 1, numberOfNodes = 10, thermalCoeffs = [0.1] * numberOfNodes, energySource = [0] * numberOfNodes):
 	#Getting the parameters
@@ -436,14 +455,16 @@ def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, 
 	dTdt = np.empty((nS, n+1))
 	dAdt = np.empty((nS, n+1))
 	dPdt = np.empty((nS, n+1))
+	
+	integrals = [[],[]]
+	integrals[0].append(integratePolar(T, dR, nS))
+	integrals[1].append(integratePolar(P, dR, nS))
 
 	#Running the simulation
 	#For Neumann boundary	
 	#boundT = np.ones(nS)*2
-	print len(t)
-	for j in range(0,len(t)):
+	for j in range(1,len(t)):
 		time = t[j]
-		#print j
 		for i in range(0,nS):
 			phi = 2*np.pi*float(i)/float(nS-1)
 			for k in range(1, n):
@@ -457,7 +478,7 @@ def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, 
 ###################################################################
 				#CHEMICAL A
 ###################################################################
-				dAdt[i][k] = D_T*(((A[(i+1)%nS][k]-2*A[i][k]+A[(i-1)%nS][k])/((dPhi**2)*(k*dR)**2))+((A[i][k+1]-2*A[i][k]+A[i][k-1])/dR**2)+((A[i][k+1]-A[i][k-1])/(dR*k*dR)))
+				#dAdt[i][k] = D_T*(((A[(i+1)%nS][k]-2*A[i][k]+A[(i-1)%nS][k])/((dPhi**2)*(k*dR)**2))+((A[i][k+1]-2*A[i][k]+A[i][k-1])/dR**2)+((A[i][k+1]-A[i][k-1])/(dR*k*dR)))
 ###################################################################
 				#PRODUCT P 
 ###################################################################
@@ -470,15 +491,16 @@ def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, 
 		#180 degrees - nS/2
 		#270 degrees - 3*nS/2
 ######### Temperature/Chemical T ##########################################################
-			dTdt[i][0] = D_T*((T[0][1]-4*T[i][0]+T[nS/4][1]+T[nS/2][1]+T[3*nS/4][1])/dR**2)
+			#dTdt[i][0] = D_T*((T[0][1]*calculateS(1, dR, nS, n)-4*T[i][0]*calculateS(0, dR, nS, n)+T[int(nS/4)][1]*calculateS(1, dR, nS, n)+T[int(nS/2)][1]*calculateS(1, dR, nS, n)+T[int(3*nS/4)][1]*calculateS(1, dR, nS, n))/dR**2)/calculateS(0, dR, nS, n)
+			dTdt[i][0] = D_T*((T[0][1]-4*T[i][0]+T[int(nS/4)][1]+T[int(nS/2)][1]+T[int(3*nS/4)][1])/dR**2)
 		#Reaction modifier A + T
-			#dTdt[i][0] += ((-kcat_A_T*A[i][0]*T[i][0])/(KM_A_T+T[i][0]))
+			dTdt[i][0] += ((-kcat_A_T*A[i][0]*T[i][0])/(KM_A_T+T[i][0]))
 ######### Chemical A ######################################################################
 			#dAdt[i][0] = D_T*((A[0][1]-4*A[i][0]+A[nS/4][1]+A[nS/2][1]+A[3*nS/4][1])/dR**2)
 ######### Product P #######################################################################
-			#dPdt[i][0] = D_T*((P[0][1]-4*P[i][0]+P[nS/4][1]+P[nS/2][1]+P[3*nS/4][1])/dR**2)
+			dPdt[i][0] = D_T*((P[0][1]-4*P[i][0]+P[nS/4][1]+P[nS/2][1]+P[3*nS/4][1])/dR**2)
 		#Reaction modifier A + T
-			#dAdt[i][0] += ((kcat_A_T*A[i][0]*T[i][0])/(KM_A_T+T[i][0]))
+			dAdt[i][0] += ((kcat_A_T*A[i][0]*T[i][0])/(KM_A_T+T[i][0]))
 		#Boundary end of slice takes values from boundary
 		#Dirichlet boundaries
 			#boundT = 2
@@ -487,33 +509,38 @@ def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, 
 		#Sine boundary
 		#bound = 20*sin(2*np.pi*(float(i)/float(nS-1)))
 		#Neumann boundary
-			if j == 0:
-				boundT = 0.5
-			else:
-				boundT = 0.5*(cos(phi))*2*dR+T[i][n-1]
-			
+			#if j == 0:
+			#	boundT = 0.5
+			#else:
+			#	boundT = 0.5*(cos(phi))*2*dR+T[i][n-1]
+			boundT = T[i][n-3]
+			boundP = P[i][n-3]
 			#print boundT
 		#Boundary point end of slice takes values from boundary
 ############# Temperature / Chemical T ############################################################################
 			dTdt[i][n] = D_T*(((T[(i+1)%nS][n]-2*T[i][n]+T[(i-1)%nS][n])/((dPhi**2)*(n*dR)**2))+((boundT-2*T[i][n]+T[i][n-1])/dR**2)+((boundT-T[i][n-1])/(dR*n*dR)))
 		#Reaction modifier A + T
-			#dTdt[i][n] += ((-kcat_A_T*A[i][n]*T[i][n])/(KM_A_T+T[i][n]))
+			dTdt[i][n] += ((-kcat_A_T*A[i][n]*T[i][n])/(KM_A_T+T[i][n]))
 ############# Chemical A ##########################################################################################
 			#dAdt[i][n] = D_T*(((A[(i+1)%nS][n]-2*A[i][n]+A[(i-1)%nS][n])/((dPhi**2)*(n*dR)**2))+((boundA-2*A[i][n]+A[i][n-1])/dR**2)+((boundA-A[i][n-1])/(dR*n*dR)))
 ############# Product P ###########################################################################################
-			#dPdt[i][n] = D_T*(((P[(i+1)%nS][n]-2*P[i][n]+P[(i-1)%nS][n])/((dPhi**2)*(n*dR)**2))+((boundP-2*P[i][n]+P[i][n-1])/dR**2)+((boundP-P[i][n-1])/(dR*n*dR)))
+			dPdt[i][n] = D_T*(((P[(i+1)%nS][n]-2*P[i][n]+P[(i-1)%nS][n])/((dPhi**2)*(n*dR)**2))+((boundP-2*P[i][n]+P[i][n-1])/dR**2)+((boundP-P[i][n-1])/(dR*n*dR)))
 		#Reaction modifier A + T
-			#dPdt[i][n] += ((kcat_A_T*A[i][n]*T[i][n])/(KM_A_T+T[i][n]))
+			dPdt[i][n] += ((kcat_A_T*A[i][n]*T[i][n])/(KM_A_T+T[i][n]))
 			
 		#Changes to T
 		T = np.add(T, dTdt*dt)
+		#print T
 		#Changes to A
 		#A = np.add(A, dAdt*dt)
 		#Changes to P
-		#P = np.add(P, dPdt*dt)
+		P = np.add(P, dPdt*dt)
 		#Plotting the simulation to heatmap
 		#if (j >= int(len(t))/2 -3 and j <= int(len(t))/2+3) or j >= len(t)-3:
-		if j >= 220:#>= len(t)-3:
+		integrals[0].append(integratePolar(T, dR, nS))
+		integrals[1].append(integratePolar(P, dR, nS))
+
+		if j == 100:#>= len(t)-1:
 			#if j > 10:
 			#	return 0
 			#Plot T
@@ -522,7 +549,7 @@ def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, 
 			c = plt.pcolormesh(th,r,T)#,vmin=tMin, vmax=tMax)
 			plt.plot(azm,r,color='k',ls='none')
 			plt.colorbar(c)
-			plt.title("Chemical T", loc="left")
+			plt.title("Chemical A", loc="left")
 			#plt.grid()
 			plt.show()
 			
@@ -538,17 +565,32 @@ def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, 
 		
 			#Plot P
 			#print P
-			#plt.subplot(projection="polar")
-			#c = plt.pcolormesh(th,r,P,vmin=0, vmax=3)
-			#plt.plot(azm,r,color='k',ls='none')
-			#plt.colorbar(c)
-			#plt.title("Chemical P", loc="left")
-			#plt.grid()
-			#plt.show()	
+			plt.subplot(projection="polar")
+			c = plt.pcolormesh(th,r,P,vmin=0, vmax=3)
+			plt.plot(azm,r,color='k',ls='none')
+			plt.colorbar(c)
+			plt.title("Product P", loc="left")
+			plt.grid()
+			plt.show()	
 			
 			#outputName = '2D_outputs/output'+"{:05d}".format(j)+'.jpg'
 			#plt.savefig(outputName, bbox_inches='tight')
 			#plt.close()
+
+	color = "%06x" % random.randint(0, 0xFFFFFF)
+	plt.plot(t, integrals[0], "#"+str(color), label="A", linewidth=4)
+	color = "%06x" % random.randint(0, 0xFFFFFF)	
+	plt.plot(t, integrals[1], "#"+str(color), label="P", linewidth=4)
+	#color = "%06x" % random.randint(0, 0xFFFFFF)
+	#plt.plot(t, integrals[1], "#"+str(color), label="A", linewidth=4)
+
+	plt.xlabel('Time')
+	plt.ylabel('Quantity')
+	plt.xlim(-0.01)
+	plt.ylim(-0.01)
+	plt.grid()
+	plt.legend(loc='best')
+	plt.show()	
 
 #########################################################################################################
 ################################ POLAR MODEL ############################################################
@@ -665,15 +707,17 @@ def applyToMatrix(matrix, funct, consts):
 	ret = matrix
 	for i in range(0,numberOfNodes):
 		for j in range(0, numberOfNodes+1):
-			ret[i][j] = 100 if j == 0 else 0
+			ret[i][j] = 0.012#100 if j == 0 else 0
 			#initFunction1(length*j/numberOfNodes)
 	return ret
 
 #finiteVolumeMethod(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
 #FTCSexample(leftBoundary, rightBoundary, finalTime, length, numberOfNodes, D0, energyS)
-FTCSmethod2D(length, length, numberOfNodes, numberOfNodes, np.zeros((numberOfNodes, numberOfNodes)), leftBoundary, leftBoundary, leftBoundary, leftBoundary, 0.001, finalTime)
+#FTCSmethod2D(length, length, numberOfNodes, numberOfNodes, np.zeros((numberOfNodes, numberOfNodes)), leftBoundary, leftBoundary, leftBoundary, leftBoundary, 0.001, finalTime)
 test = np.zeros((numberOfNodes, numberOfNodes+1))
-#FTCSmethod2DPolar(length, numberOfNodes, numberOfNodes, test, leftBoundary, 0.01, finalTime)
+for i in test:
+	i[len(i)-20] = 10
+FTCSmethod2DPolar(length, numberOfNodes, numberOfNodes, test, leftBoundary, 0.01, finalTime)
 names = ["T", "A", "P"]#, "B", "C", "D", "E", "F", "G" ,"H"]
 init = []
 init.append(np.zeros((numberOfNodes, numberOfNodes+1)))
