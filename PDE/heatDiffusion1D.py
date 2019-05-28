@@ -2,11 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import random
+import sys
 from math import sin, cos, tan, pi
 length = 1
 numberOfNodes = 50
-leftBoundary = 0
-rightBoundary = 0
+leftBoundary = 2
+rightBoundary = 2
 finalTime = 60
 
 D0 = np.ones(numberOfNodes)*0.1
@@ -247,7 +248,7 @@ def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, l
 	nx = numberOfNodesX
 	ny = numberOfNodesY
 	T = initMatrix
-	T[5][6] = 1200
+	#T[5][6] = 1200
 	T1Sx = leftBoundaryX
 	T1Sy = leftBoundaryY
 	T2Sx = rightBoundaryX
@@ -259,10 +260,12 @@ def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, l
 	X,Y = np.meshgrid(x,y)
 	t_final = finalTime
 	alpha = thermalConst
+	alphaA = float(alpha)*2
 
 	#Calculating suitable dt
 	dt = calcTimeStep2D(dx, dy, float(alpha))
-	
+	dt = dt if dt < calcTimeStep2D(dx, dy, float(alphaA)) else calcTimeStep2D(dx, dy, float(alphaA)) 
+	print dt
 	
 	#Finding minimum and maximum values of temperature
 	#They're either in initMatrix or one boundaries
@@ -285,12 +288,15 @@ def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, l
 	t = np.arange(0, t_final, dt)
 	dTdt = np.empty((nx, ny))
 	dAdt = np.empty((nx, ny))
-	integrals = [[1200],[0]]
+	integrals = [[],[]]
 	#Reaction parameters
 	k_cat_A_T = 4.2
 	KM_A_T = 0.052
 	EM = 0.012
 	A = np.zeros((numberOfNodesX, numberOfNodesY))
+	print len(t)
+	#integrals[0].append(integrateCartesian(T, dx, dy))
+	#integrals[1].append(integrateCartesian(A, dx, dy))
 	#Running the simulation
 	for j in range(1,len(t)):
 		for i in range(1,nx-1):
@@ -300,71 +306,72 @@ def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, l
 				dTdt[i][k] = alpha*((-(T[i][k]-T[i-1][k])/dx**2+(T[i+1][k]-T[i][k])/dx**2)+(-(T[i][k]-T[i][k-1])/dy**2+(T[i][k+1]-T[i][k])/dy**2))
 				dTdt[i][k] += (-k_cat_A_T*EM*T[i][k])#/(KM_A_T+T[i][k])
 				#A
-				dAdt[i][k] = alpha*((-(A[i][k]-A[i-1][k])/dx**2+(A[i+1][k]-A[i][k])/dx**2)+(-(A[i][k]-A[i][k-1])/dy**2+(A[i][k+1]-A[i][k])/dy**2))
+				dAdt[i][k] = alphaA*((-(A[i][k]-A[i-1][k])/dx**2+(A[i+1][k]-A[i][k])/dx**2)+(-(A[i][k]-A[i][k-1])/dy**2+(A[i][k+1]-A[i][k])/dy**2))
 				dAdt[i][k] += (k_cat_A_T*EM*T[i][k])#/(KM_A_T+T[i][k])
 			#Left and right borders
 			#T
-			#dTdt[i][0] = alpha*((-(T[i][0]-T[i-1][0])/dx**2+(T[i+1][0]-T[i][0])/dx**2)+(-(T[i][0]-leftBoundaryY)/dy**2+(T[i][1]-T[i][0])/dy**2))
+			dTdt[i][0] = alpha*((-(T[i][0]-T[i-1][0])/dx**2+(T[i+1][0]-T[i][0])/dx**2)+(-(T[i][0]-leftBoundaryY)/dy**2+(T[i][1]-T[i][0])/dy**2))
 			#insulated boundaries
-			dTdt[i][0] = alpha*((-(T[i][0]-T[i-1][0])/dx**2+(T[i+1][0]-T[i][0])/dx**2)+(-(T[i][0]-T[i][1])/dy**2+(T[i][1]-T[i][0])/dy**2))
+			#dTdt[i][0] = alpha*((-(T[i][0]-T[i-1][0])/dx**2+(T[i+1][0]-T[i][0])/dx**2)+(-(T[i][0]-T[i][1])/dy**2+(T[i][1]-T[i][0])/dy**2))
 			dTdt[i][0] += (-k_cat_A_T*EM*T[i][0])#/(KM_A_T+T[i][0])
-			#dTdt[i][ny-1] = alpha*((-(T[i][ny-1]-T[i-1][ny-1])/dx**2+(T[i+1][ny-1]-T[i][ny-1])/dx**2)+(-(T[i][ny-1]-T[i][ny-2])/dy**2+(rightBoundaryY-T[i][ny-1])/dy**2))
+			dTdt[i][ny-1] = alpha*((-(T[i][ny-1]-T[i-1][ny-1])/dx**2+(T[i+1][ny-1]-T[i][ny-1])/dx**2)+(-(T[i][ny-1]-T[i][ny-2])/dy**2+(rightBoundaryY-T[i][ny-1])/dy**2))
 			#insulated boundaries
-			dTdt[i][ny-1] = alpha*((-(T[i][ny-1]-T[i-1][ny-1])/dx**2+(T[i+1][ny-1]-T[i][ny-1])/dx**2)+(-(T[i][ny-1]-T[i][ny-2])/dy**2+(T[i][ny-2]-T[i][ny-1])/dy**2))
+			#dTdt[i][ny-1] = alpha*((-(T[i][ny-1]-T[i-1][ny-1])/dx**2+(T[i+1][ny-1]-T[i][ny-1])/dx**2)+(-(T[i][ny-1]-T[i][ny-2])/dy**2+(T[i][ny-2]-T[i][ny-1])/dy**2))
 			dTdt[i][ny-1] += (-k_cat_A_T*EM*T[i][ny-1])#/(KM_A_T+T[i][ny-1])
 			#A
-			#dAdt[i][0] = alpha*((-(A[i][0]-A[i-1][0])/dx**2+(A[i+1][0]-A[i][0])/dx**2)+(-(A[i][0]-leftBoundaryY)/dy**2+(A[i][1]-A[i][0])/dy**2))
+			dAdt[i][0] = alphaA*((-(A[i][0]-A[i-1][0])/dx**2+(A[i+1][0]-A[i][0])/dx**2)+(-(A[i][0]-leftBoundaryY)/dy**2+(A[i][1]-A[i][0])/dy**2))
 			#insulated boundaries
-			dAdt[i][0] = alpha*((-(A[i][0]-A[i-1][0])/dx**2+(A[i+1][0]-A[i][0])/dx**2)+(-(A[i][0]-A[i][1])/dy**2+(A[i][1]-A[i][0])/dy**2))
+			#dAdt[i][0] = alpha*((-(A[i][0]-A[i-1][0])/dx**2+(A[i+1][0]-A[i][0])/dx**2)+(-(A[i][0]-A[i][1])/dy**2+(A[i][1]-A[i][0])/dy**2))
 			dAdt[i][0] += (k_cat_A_T*EM*T[i][0])#/(KM_A_T+T[i][0])
-			#dAdt[i][ny-1] = alpha*((-(A[i][ny-1]-A[i-1][ny-1])/dx**2+(A[i+1][ny-1]-A[i][ny-1])/dx**2)+(-(A[i][ny-1]-A[i][ny-2])/dy**2+(rightBoundaryY-A[i][ny-1])/dy**2))
+			dAdt[i][ny-1] = alphaA*((-(A[i][ny-1]-A[i-1][ny-1])/dx**2+(A[i+1][ny-1]-A[i][ny-1])/dx**2)+(-(A[i][ny-1]-A[i][ny-2])/dy**2+(rightBoundaryY-A[i][ny-1])/dy**2))
 			#insulated boundaries
-			dAdt[i][ny-1] = alpha*((-(A[i][ny-1]-A[i-1][ny-1])/dx**2+(A[i+1][ny-1]-A[i][ny-1])/dx**2)+(-(A[i][ny-1]-A[i][ny-2])/dy**2+(A[i][ny-2]-A[i][ny-1])/dy**2))
+			#dAdt[i][ny-1] = alpha*((-(A[i][ny-1]-A[i-1][ny-1])/dx**2+(A[i+1][ny-1]-A[i][ny-1])/dx**2)+(-(A[i][ny-1]-A[i][ny-2])/dy**2+(A[i][ny-2]-A[i][ny-1])/dy**2))
 			dAdt[i][ny-1] += (k_cat_A_T*EM*T[i][ny-1])#/(KM_A_T+T[i][ny-1])
 
 		for y in range(1, ny-1):
 			#Top and bottom borders
 			#T
-			#dTdt[0][y] = alpha*((-(T[0][y]-leftBoundaryX)/dx**2+(T[1][y]-T[0][y])/dx**2)+(-(T[0][y]-T[0][y-1])/dy**2+(T[0][y+1]-T[0][y])/dy**2))
-			#dTdt[nx-1][y] = alpha*((-(T[nx-1][y]-T[nx-2][y])/dx**2+(rightBoundaryX-T[nx-1][y])/dx**2)+(-(T[nx-1][y]-T[nx-1][y-1])/dy**2+(T[nx-1][y+1]-T[nx-1][y])/dy**2))
+			dTdt[0][y] = alpha*((-(T[0][y]-leftBoundaryX)/dx**2+(T[1][y]-T[0][y])/dx**2)+(-(T[0][y]-T[0][y-1])/dy**2+(T[0][y+1]-T[0][y])/dy**2))
+			dTdt[nx-1][y] = alpha*((-(T[nx-1][y]-T[nx-2][y])/dx**2+(rightBoundaryX-T[nx-1][y])/dx**2)+(-(T[nx-1][y]-T[nx-1][y-1])/dy**2+(T[nx-1][y+1]-T[nx-1][y])/dy**2))
 			#insulated boundaries
-			dTdt[0][y] = alpha*((-(T[0][y]-T[1][y])/dx**2+(T[1][y]-T[0][y])/dx**2)+(-(T[0][y]-T[0][y-1])/dy**2+(T[0][y+1]-T[0][y])/dy**2))
-			dTdt[nx-1][y] = alpha*((-(T[nx-1][y]-T[nx-2][y])/dx**2+(T[nx-1][y-1]-T[nx-1][y])/dx**2)+(-(T[nx-1][y]-T[nx-1][y-1])/dy**2+(T[nx-1][y+1]-T[nx-1][y])/dy**2))
+			#dTdt[0][y] = alpha*((-(T[0][y]-T[1][y])/dx**2+(T[1][y]-T[0][y])/dx**2)+(-(T[0][y]-T[0][y-1])/dy**2+(T[0][y+1]-T[0][y])/dy**2))
+			#dTdt[nx-1][y] = alpha*((-(T[nx-1][y]-T[nx-2][y])/dx**2+(T[nx-1][y-1]-T[nx-1][y])/dx**2)+(-(T[nx-1][y]-T[nx-1][y-1])/dy**2+(T[nx-1][y+1]-T[nx-1][y])/dy**2))
 			dTdt[0][y] += (-k_cat_A_T*EM*T[0][y])#/(KM_A_T+T[0][y])
 			dTdt[nx-1][y] += (-k_cat_A_T*EM*T[nx-1][y])#/(KM_A_T+T[nx-1][y])
 			#A
-			#dAdt[0][y] = alpha*((-(A[0][y]-leftBoundaryX)/dx**2+(A[1][y]-A[0][y])/dx**2)+(-(A[0][y]-A[0][y-1])/dy**2+(A[0][y+1]-A[0][y])/dy**2))
-			#dAdt[nx-1][y] = alpha*((-(A[nx-1][y]-A[nx-2][y])/dx**2+(rightBoundaryX-A[nx-1][y])/dx**2)+(-(A[nx-1][y]-A[nx-1][y-1])/dy**2+(A[nx-1][y+1]-A[nx-1][y])/dy**2))
+			dAdt[0][y] = alphaA*((-(A[0][y]-leftBoundaryX)/dx**2+(A[1][y]-A[0][y])/dx**2)+(-(A[0][y]-A[0][y-1])/dy**2+(A[0][y+1]-A[0][y])/dy**2))
+			dAdt[nx-1][y] = alphaA*((-(A[nx-1][y]-A[nx-2][y])/dx**2+(rightBoundaryX-A[nx-1][y])/dx**2)+(-(A[nx-1][y]-A[nx-1][y-1])/dy**2+(A[nx-1][y+1]-A[nx-1][y])/dy**2))
 			#insulated boundaries
-			dAdt[0][y] = alpha*((-(A[0][y]-A[1][y])/dx**2+(A[1][y]-A[0][y])/dx**2)+(-(A[0][y]-A[0][y-1])/dy**2+(A[0][y+1]-A[0][y])/dy**2))
-			dAdt[nx-1][y] = alpha*((-(A[nx-1][y]-A[nx-2][y])/dx**2+(A[nx-1][y-1]-A[nx-1][y])/dx**2)+(-(A[nx-1][y]-A[nx-1][y-1])/dy**2+(A[nx-1][y+1]-A[nx-1][y])/dy**2))
+			#dAdt[0][y] = alpha*((-(A[0][y]-A[1][y])/dx**2+(A[1][y]-A[0][y])/dx**2)+(-(A[0][y]-A[0][y-1])/dy**2+(A[0][y+1]-A[0][y])/dy**2))
+			#dAdt[nx-1][y] = alpha*((-(A[nx-1][y]-A[nx-2][y])/dx**2+(A[nx-1][y-1]-A[nx-1][y])/dx**2)+(-(A[nx-1][y]-A[nx-1][y-1])/dy**2+(A[nx-1][y+1]-A[nx-1][y])/dy**2))
 			dAdt[0][y] += (k_cat_A_T*EM*T[0][y])#/(KM_A_T+T[0][y])
 			dAdt[nx-1][y] += (k_cat_A_T*EM*T[nx-1][y])#/(KM_A_T+T[nx-1][y])
 			
 			#Corners
 			#T
-			#dTdt[0][0] = alpha*((-(T[0][0]-leftBoundaryX)/dx**2+(T[1][0]-T[0][0])/dx**2)+(-(T[0][0]-leftBoundaryY)/dy**2+(T[0][1]-T[0][0])/dy**2))
-			#dTdt[nx-1][0] = alpha*((-(T[nx-1][0]-T[nx-2][0])/dx**2+(rightBoundaryX-T[nx-1][0])/dx**2)+(-(T[nx-1][0]-leftBoundaryY)/dy**2+(T[nx-1][1]-T[nx-1][0])/dy**2))
-			#dTdt[0][ny-1] = alpha*((-(T[0][ny-1]-rightBoundaryX)/dx**2+(T[1][ny-1]-T[0][ny-1])/dx**2)+(-(T[0][ny-1]-T[0][ny-2])/dy**2+(rightBoundaryY-T[0][ny-1])/dy**2))
-			#dTdt[nx-1][ny-1] = alpha*((-(T[nx-1][ny-1]-T[nx-2][ny-1])/dx**2+(leftBoundaryX-T[nx-1][ny-1])/dx**2)+(-(T[nx-1][ny-1]-T[nx-1][ny-2])/dy**2+(leftBoundaryY-T[nx-1][ny-1])/dy**2))
+			dTdt[0][0] = alpha*((-(T[0][0]-leftBoundaryX)/dx**2+(T[1][0]-T[0][0])/dx**2)+(-(T[0][0]-leftBoundaryY)/dy**2+(T[0][1]-T[0][0])/dy**2))
+			dTdt[nx-1][0] = alpha*((-(T[nx-1][0]-T[nx-2][0])/dx**2+(rightBoundaryX-T[nx-1][0])/dx**2)+(-(T[nx-1][0]-leftBoundaryY)/dy**2+(T[nx-1][1]-T[nx-1][0])/dy**2))
+			dTdt[0][ny-1] = alpha*((-(T[0][ny-1]-rightBoundaryX)/dx**2+(T[1][ny-1]-T[0][ny-1])/dx**2)+(-(T[0][ny-1]-T[0][ny-2])/dy**2+(rightBoundaryY-T[0][ny-1])/dy**2))
+			dTdt[nx-1][ny-1] = alpha*((-(T[nx-1][ny-1]-T[nx-2][ny-1])/dx**2+(leftBoundaryX-T[nx-1][ny-1])/dx**2)+(-(T[nx-1][ny-1]-T[nx-1][ny-2])/dy**2+(leftBoundaryY-T[nx-1][ny-1])/dy**2))
 			#insulated boundaries
-			dTdt[0][0] = alpha*((-(T[0][0]-T[1][0])/dx**2+(T[1][0]-T[0][0])/dx**2)+(-(T[0][0]-T[0][1])/dy**2+(T[0][1]-T[0][0])/dy**2))
-			dTdt[nx-1][0] = alpha*((-(T[nx-1][0]-T[nx-2][0])/dx**2+(T[nx-2][0]-T[nx-1][0])/dx**2)+(-(T[nx-1][0]-T[nx-1][1])/dy**2+(T[nx-1][1]-T[nx-1][0])/dy**2))
-			dTdt[0][ny-1] = alpha*((-(T[0][ny-1]-T[1][ny-1])/dx**2+(T[1][ny-1]-T[0][ny-1])/dx**2)+(-(T[0][ny-1]-T[0][ny-2])/dy**2+(T[0][ny-2]-T[0][ny-1])/dy**2))
-			dTdt[nx-1][ny-1] = alpha*((-(T[nx-1][ny-1]-T[nx-2][ny-1])/dx**2+(T[nx-2][ny-1]-T[nx-1][ny-1])/dx**2)+(-(T[nx-1][ny-1]-T[nx-1][ny-2])/dy**2+(T[nx-1][ny-2]-T[nx-1][ny-1])/dy**2))
+			#dTdt[0][0] = alpha*((-(T[0][0]-T[1][0])/dx**2+(T[1][0]-T[0][0])/dx**2)+(-(T[0][0]-T[0][1])/dy**2+(T[0][1]-T[0][0])/dy**2))
+			#dTdt[nx-1][0] = alpha*((-(T[nx-1][0]-T[nx-2][0])/dx**2+(T[nx-2][0]-T[nx-1][0])/dx**2)+(-(T[nx-1][0]-T[nx-1][1])/dy**2+(T[nx-1][1]-T[nx-1][0])/dy**2))
+			#dTdt[0][ny-1] = alpha*((-(T[0][ny-1]-T[1][ny-1])/dx**2+(T[1][ny-1]-T[0][ny-1])/dx**2)+(-(T[0][ny-1]-T[0][ny-2])/dy**2+(T[0][ny-2]-T[0][ny-1])/dy**2))
+			#dTdt[nx-1][ny-1] = alpha*((-(T[nx-1][ny-1]-T[nx-2][ny-1])/dx**2+(T[nx-2][ny-1]-T[nx-1][ny-1])/dx**2)+(-(T[nx-1][ny-1]-T[nx-1][ny-2])/dy**2+(T[nx-1][ny-2]-T[nx-1][ny-1])/dy**2))
 			dTdt[0][0] += (-k_cat_A_T*EM*T[0][0])#/(KM_A_T+T[0][0])
 			dTdt[nx-1][0] += (-k_cat_A_T*EM*T[nx-1][0])#/(KM_A_T+T[nx-1][0])
 			dTdt[0][ny-1] += (-k_cat_A_T*EM*T[0][ny-1])#/(KM_A_T+T[0][ny-1])
 			dTdt[nx-1][ny-1] += (-k_cat_A_T*EM*T[nx-1][ny-1])#/(KM_A_T+T[nx-1][ny-1])
 			#A
-			#dAdt[0][0] = alpha*((-(A[0][0]-leftBoundaryX)/dx**2+(A[1][0]-A[0][0])/dx**2)+(-(A[0][0]-leftBoundaryY)/dy**2+(A[0][1]-A[0][0])/dy**2))
-			#dAdt[nx-1][0] = alpha*((-(A[nx-1][0]-A[nx-2][0])/dx**2+(rightBoundaryX-A[nx-1][0])/dx**2)+(-(A[nx-1][0]-leftBoundaryY)/dy**2+(A[nx-1][1]-A[nx-1][0])/dy**2))
-			#dAdt[0][ny-1] = alpha*((-(A[0][ny-1]-rightBoundaryX)/dx**2+(A[1][ny-1]-A[0][ny-1])/dx**2)+(-(A[0][ny-1]-A[0][ny-2])/dy**2+(rightBoundaryY-A[0][ny-1])/dy**2))
-			#dAdt[nx-1][ny-1] = alpha*((-(A[nx-1][ny-1]-A[nx-2][ny-1])/dx**2+(leftBoundaryX-A[nx-1][ny-1])/dx**2)+(-(A[nx-1][ny-1]-A[nx-1][ny-2])/dy**2+(leftBoundaryY-A[nx-1][ny-1])/dy**2))
-			dAdt[0][0] = alpha*((-(A[0][0]-A[1][0])/dx**2+(A[1][0]-A[0][0])/dx**2)+(-(A[0][0]-A[0][1])/dy**2+(A[0][1]-A[0][0])/dy**2))
-			dAdt[nx-1][0] = alpha*((-(A[nx-1][0]-A[nx-2][0])/dx**2+(A[nx-2][0]-A[nx-1][0])/dx**2)+(-(A[nx-1][0]-A[nx-1][1])/dy**2+(A[nx-1][1]-A[nx-1][0])/dy**2))
-			dAdt[0][ny-1] = alpha*((-(A[0][ny-1]-A[1][ny-1])/dx**2+(A[1][ny-1]-A[0][ny-1])/dx**2)+(-(A[0][ny-1]-A[0][ny-2])/dy**2+(A[0][ny-2]-A[0][ny-1])/dy**2))
-			dAdt[nx-1][ny-1] = alpha*((-(A[nx-1][ny-1]-A[nx-2][ny-1])/dx**2+(A[nx-2][ny-1]-A[nx-1][ny-1])/dx**2)+(-(A[nx-1][ny-1]-A[nx-1][ny-2])/dy**2+(A[nx-1][ny-2]-A[nx-1][ny-1])/dy**2))
+			dAdt[0][0] = alphaA*((-(A[0][0]-leftBoundaryX)/dx**2+(A[1][0]-A[0][0])/dx**2)+(-(A[0][0]-leftBoundaryY)/dy**2+(A[0][1]-A[0][0])/dy**2))
+			dAdt[nx-1][0] = alphaA*((-(A[nx-1][0]-A[nx-2][0])/dx**2+(rightBoundaryX-A[nx-1][0])/dx**2)+(-(A[nx-1][0]-leftBoundaryY)/dy**2+(A[nx-1][1]-A[nx-1][0])/dy**2))
+			dAdt[0][ny-1] = alphaA*((-(A[0][ny-1]-rightBoundaryX)/dx**2+(A[1][ny-1]-A[0][ny-1])/dx**2)+(-(A[0][ny-1]-A[0][ny-2])/dy**2+(rightBoundaryY-A[0][ny-1])/dy**2))
+			dAdt[nx-1][ny-1] = alphaA*((-(A[nx-1][ny-1]-A[nx-2][ny-1])/dx**2+(leftBoundaryX-A[nx-1][ny-1])/dx**2)+(-(A[nx-1][ny-1]-A[nx-1][ny-2])/dy**2+(leftBoundaryY-A[nx-1][ny-1])/dy**2))
+			#insulated boundaries
+			#dAdt[0][0] = alpha*((-(A[0][0]-A[1][0])/dx**2+(A[1][0]-A[0][0])/dx**2)+(-(A[0][0]-A[0][1])/dy**2+(A[0][1]-A[0][0])/dy**2))
+			#dAdt[nx-1][0] = alpha*((-(A[nx-1][0]-A[nx-2][0])/dx**2+(A[nx-2][0]-A[nx-1][0])/dx**2)+(-(A[nx-1][0]-A[nx-1][1])/dy**2+(A[nx-1][1]-A[nx-1][0])/dy**2))
+			#dAdt[0][ny-1] = alpha*((-(A[0][ny-1]-A[1][ny-1])/dx**2+(A[1][ny-1]-A[0][ny-1])/dx**2)+(-(A[0][ny-1]-A[0][ny-2])/dy**2+(A[0][ny-2]-A[0][ny-1])/dy**2))
+			#dAdt[nx-1][ny-1] = alpha*((-(A[nx-1][ny-1]-A[nx-2][ny-1])/dx**2+(A[nx-2][ny-1]-A[nx-1][ny-1])/dx**2)+(-(A[nx-1][ny-1]-A[nx-1][ny-2])/dy**2+(A[nx-1][ny-2]-A[nx-1][ny-1])/dy**2))
 			dAdt[0][0] += (k_cat_A_T*EM*T[0][0])#/(KM_A_T+T[0][0])
 			dAdt[nx-1][0] += (k_cat_A_T*EM*T[nx-1][0])#/(KM_A_T+T[nx-1][0])
 			dAdt[0][ny-1] += (k_cat_A_T*EM*T[0][ny-1])#/(KM_A_T+T[0][ny-1])
@@ -375,36 +382,37 @@ def FTCSmethod2D(lengthX, lengthY, numberOfNodesX, numberOfNodesY, initMatrix, l
 		integrals[0].append(integrateCartesian(T, dx, dy))
 		integrals[1].append(integrateCartesian(A, dx, dy))
 		#Plotting the simulation to heatmap
-		if not j:# % 10:
+		if j == 10 or j == int(len(t)/2)-1 or j == len(t)-1 :# % 10:
 			fig, ax = plt.subplots()
 			c = ax.pcolormesh(X,Y, T, cmap='RdBu_r')#, vmin=tMin, vmax=tMax)
-			ax.set_title('T')
+			#ax.set_title('T')
+			ax.set_title('A')
 			ax.axis([dx/2, Lx-dx/2, dy/2, Ly-dy/2])
 			fig.colorbar(c, ax=ax)
 			plt.show()
 			
 			fig, ax = plt.subplots()
-			c = ax.pcolormesh(X,Y, A, cmap='RdBu_r')#, vmin=tMin, vmax=tMax)
-			ax.set_title('A')
+			c = ax.pcolormesh(X,Y, A, cmap='RdBu_r')# vmin=tMin, vmax=tMax)
+			ax.set_title('B')
 			ax.axis([dx/2, Lx-dx/2, dy/2, Ly-dy/2])
 			fig.colorbar(c, ax=ax)
 			plt.show()
-			#outputName = '2D_outputs/output'+"{:05d}".format(j)+'.jpg'
-			#plt.savefig(outputName, bbox_inches='tight')
-			#plt.close()
+			outputName = '2D_outputs/output'+"{:05d}".format(j)+'.jpg'
+			plt.savefig(outputName, bbox_inches='tight')
+			plt.close()
 	
-	color = "%06x" % random.randint(0, 0xFFFFFF)
-	plt.plot(t, integrals[0], "#"+str(color), label="T", linewidth=4)
-	color = "%06x" % random.randint(0, 0xFFFFFF)
-	plt.plot(t, integrals[1], "#"+str(color), label="A", linewidth=4)
+	#color = "%06x" % random.randint(0, 0xFFFFFF)
+	#plt.plot(t, integrals[0], "#"+str(color), label="T", linewidth=4)
+	#color = "%06x" % random.randint(0, 0xFFFFFF)
+	#plt.plot(t, integrals[1], "#"+str(color), label="A", linewidth=4)
 
-	plt.xlabel('Time')
-	plt.ylabel('Quantity')
-	plt.xlim(-0.01)
-	plt.ylim(-0.01)
-	plt.grid()
-	plt.legend(loc='best')
-	plt.show()	
+#	plt.xlabel('Time')
+#	plt.ylabel('Quantity')
+#	plt.xlim(-0.01)
+#	plt.ylim(-0.01)
+#	plt.grid()
+#	plt.legend(loc='best')
+#	plt.show()	
 #########################################################################################################
 ################################ POLAR MODEL ############################################################
 #########################################################################################################
@@ -540,11 +548,12 @@ def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, 
 		integrals[0].append(integratePolar(T, dR, nS))
 		integrals[1].append(integratePolar(P, dR, nS))
 
-		if j == 100:#>= len(t)-1:
+		if j == (len(t)/60) or j == len(t)-1:
 			#if j > 10:
 			#	return 0
 			#Plot T
 			#print T
+			print j*dt
 			plt.subplot(projection="polar")
 			c = plt.pcolormesh(th,r,T)#,vmin=tMin, vmax=tMax)
 			plt.plot(azm,r,color='k',ls='none')
@@ -566,7 +575,7 @@ def FTCSmethod2DPolar(R, numberOfNodes, numberOfSegments, initMatrix, boundary, 
 			#Plot P
 			#print P
 			plt.subplot(projection="polar")
-			c = plt.pcolormesh(th,r,P,vmin=0, vmax=3)
+			c = plt.pcolormesh(th,r,P)#,vmin=0, vmax=3)
 			plt.plot(azm,r,color='k',ls='none')
 			plt.colorbar(c)
 			plt.title("Product P", loc="left")
@@ -716,8 +725,12 @@ def applyToMatrix(matrix, funct, consts):
 #FTCSmethod2D(length, length, numberOfNodes, numberOfNodes, np.zeros((numberOfNodes, numberOfNodes)), leftBoundary, leftBoundary, leftBoundary, leftBoundary, 0.001, finalTime)
 test = np.zeros((numberOfNodes, numberOfNodes+1))
 for i in test:
-	i[len(i)-20] = 10
-FTCSmethod2DPolar(length, numberOfNodes, numberOfNodes, test, leftBoundary, 0.01, finalTime)
+	i[int(len(i)/2)] = 10
+#test[20][20] = 10#[len(test[0])-20] = 0
+#test[21][20] = 10
+#test[20][21] = 10
+#test[21][21] = 10
+#FTCSmethod2DPolar(length, numberOfNodes, numberOfNodes, test, leftBoundary, 0.01, finalTime)
 names = ["T", "A", "P"]#, "B", "C", "D", "E", "F", "G" ,"H"]
 init = []
 init.append(np.zeros((numberOfNodes, numberOfNodes+1)))
@@ -771,3 +784,205 @@ diffConsts = [0.01, 0.01, 0.01]#, 0.025, 0.05, 0.03, 0.033, 0.06, 0.04, 0.045, 0
 #2+sin(phi)
 bounds = [("f", "2"), ("f","0"),("f","0")]
 #FTCSmethod2DPolarExtended(length, finalTime, names, init, diffConsts, reactMods, constants, bounds)
+
+###############################################################################################################################
+#OSCILLATOR MODEL
+###############################################################################################################################
+def oscillatorModel(lengthX, lengthY, initMatrices, diffCoeffs, finalTime, boundaries = []):
+	#Getting the parameters
+	Lx = lengthX
+	Ly = lengthY
+	nx = len(initMatrices[0][0])
+	ny = len(initMatrices[0])
+	dx = float(Lx)/float(nx)
+	dy = float(Ly)/float(ny)
+	x = np.linspace(dx/2, Lx-dx/2, nx)
+	y = np.linspace(dy/2, Ly-dy/2, ny)
+	X,Y = np.meshgrid(x,y)
+	t_final = finalTime
+	D_1 = diffCoeffs[0]
+	D_2 = diffCoeffs[1]
+	D_3 = diffCoeffs[2]
+
+	A = initMatrices[0]
+	B = initMatrices[1]
+	C = initMatrices[2]
+
+	#Calculating suitable dt
+	dt = calcTimeStep2D(dx, dy, float(D_1))
+	dt = dt if dt < calcTimeStep2D(dx, dy, float(D_2)) else calcTimeStep2D(dx, dy, float(D_2))
+	dt = dt if dt < calcTimeStep2D(dx, dy, float(D_3)) else calcTimeStep2D(dx, dy, float(D_3)) 
+
+	t = np.arange(0, t_final, dt)
+	dAdt = np.empty((nx, ny))
+	dBdt = np.empty((nx, ny))
+	dCdt = np.empty((nx, ny))
+
+	#Total balance	
+	integrals = [[],[],[]]
+	#Balance of t = 0
+	integrals[0].append(integrateCartesian(A, dx, dy))
+	integrals[1].append(integrateCartesian(B, dx, dy))
+	integrals[2].append(integrateCartesian(C, dx, dy))
+
+	#Oscillator parameters
+	K_1 = 1
+	K_2 = 1
+	K_3 = 1
+	#Tunable parameters
+	alpha_0 = 0
+	alpha = 60*(5)
+	Beta = 0.5
+	n = 2.1
+
+#Oscillator rates of change from .sy file as follows:
+#A Beta*(alpha_0+alpha/(1+(C/K_3)**n))-Beta*A 0.1
+#B Beta*(alpha_0+alpha/(1+(A/K_1)**n))-Beta*B 0.1
+#C Beta*(alpha_0+alpha/(1+(B/K_2)**n))-Beta*C 0.5
+#1 100 10000
+	#Running the simulation
+	for j in range(1,len(t)):
+		for i in range(1,ny-1):
+			for k in range(1, nx-1):
+				#Inner square
+				#A
+				dAdt[i][k] = D_1*((A[i+1][k]-2*A[i][k]+A[i-1][k])/dy**2+(A[i][k+1]-2*A[i][k]+A[i][k-1])/dx**2)
+				dAdt[i][k] += Beta*(alpha_0+alpha/(1+(C[i][k]/K_3)**n))-Beta*A[i][k]
+				#B
+				dBdt[i][k] = D_2*((B[i+1][k]-2*B[i][k]+B[i-1][k])/dy**2+(B[i][k+1]-2*B[i][k]+B[i][k-1])/dx**2)
+				dBdt[i][k] += Beta*(alpha_0+alpha/(1+(A[i][k]/K_1)**n))-Beta*B[i][k]
+				#C
+				dCdt[i][k] = D_3*((C[i+1][k]-2*C[i][k]+C[i-1][k])/dy**2+(C[i][k+1]-2*C[i][k]+C[i][k-1])/dx**2)
+				dCdt[i][k] += Beta*(alpha_0+alpha/(1+(B[i][k]/K_2)**n))-Beta*C[i][k]
+			#Left and right borders
+			#A
+			#Boundary is insulated
+			dAdt[i][0] = D_1*((A[i+1][0]-2*A[i][0]+A[i-1][0])/dy**2+(A[i][1]-2*A[i][0]+A[i][1])/dx**2)
+			dAdt[i][0] += Beta*(alpha_0+alpha/(1+(C[i][0]/K_3)**n))-Beta*A[i][0]
+			dAdt[i][nx-1] = D_1*((A[i+1][nx-1]-2*A[i][nx-1]+A[i-1][nx-1])/dy**2+(A[i][nx-2]-2*A[i][nx-1]+A[i][nx-2])/dx**2)
+			dAdt[i][nx-1] += Beta*(alpha_0+alpha/(1+(C[i][nx-1]/K_3)**n))-Beta*A[i][nx-1]
+			#B
+			#Boundary is insulated
+			dBdt[i][0] = D_2*((B[i+1][0]-2*B[i][0]+B[i-1][0])/dy**2+(B[i][1]-2*B[i][0]+B[i][1])/dx**2)
+			dBdt[i][0] += Beta*(alpha_0+alpha/(1+(A[i][0]/K_1)**n))-Beta*B[i][0]
+			dBdt[i][nx-1] = D_2*((B[i+1][nx-1]-2*B[i][nx-1]+B[i-1][nx-1])/dy**2+(B[i][nx-2]-2*B[i][nx-1]+B[i][nx-2])/dx**2)
+			dBdt[i][nx-1] += Beta*(alpha_0+alpha/(1+(A[i][nx-1]/K_1)**n))-Beta*B[i][nx-1]
+			#C
+			#Boundary is insulated
+			dCdt[i][0] = D_3*((C[i+1][0]-2*C[i][0]+C[i-1][0])/dy**2+(C[i][1]-2*C[i][0]+C[i][1])/dx**2)
+			dCdt[i][0] += Beta*(alpha_0+alpha/(1+(B[i][0]/K_2)**n))-Beta*C[i][0]
+			dCdt[i][nx-1] = D_3*((C[i+1][nx-1]-2*C[i][nx-1]+C[i-1][nx-1])/dy**2+(C[i][nx-2]-2*C[i][nx-1]+C[i][nx-2])/dx**2)
+			dCdt[i][nx-1] += Beta*(alpha_0+alpha/(1+(B[i][nx-1]/K_2)**n))-Beta*C[i][nx-1]
+		for x in range(1, nx-1):
+			#Top and bottom borders
+			#Boundary is insulated
+			dAdt[0][x] = D_1*((A[1][x]-2*A[0][x]+A[1][x])/dy**2+(A[0][x+1]-2*A[0][x]+A[0][x-1])/dx**2)
+			dAdt[0][x] += Beta*(alpha_0+alpha/(1+(C[0][x]/K_3)**n))-Beta*A[0][x]
+			dAdt[ny-1][x] = D_1*((A[ny-2][x]-2*A[ny-1][x]+A[ny-2][x])/dy**2+(A[ny-1][x+1]-2*A[ny-1][x]+A[ny-1][x-1])/dx**2)
+			dAdt[ny-1][x] += Beta*(alpha_0+alpha/(1+(C[ny-1][x]/K_3)**n))-Beta*A[ny-1][x]
+			#B
+			#Boundary is insulated
+			dBdt[0][x] = D_2*((B[1][x]-2*B[0][x]+B[1][x])/dy**2+(B[0][x+1]-2*B[0][x]+B[0][x-1])/dx**2)
+			dBdt[0][x] += Beta*(alpha_0+alpha/(1+(A[0][x]/K_1)**n))-Beta*B[0][x]
+			dBdt[ny-1][x] = D_2*((B[ny-2][x]-2*B[ny-1][x]+B[ny-2][x])/dy**2+(B[ny-1][x+1]-2*B[ny-1][x]+B[ny-1][x-1])/dx**2)
+			dBdt[ny-1][x] += Beta*(alpha_0+alpha/(1+(A[ny-1][x]/K_1)**n))-Beta*B[ny-1][x]
+			#C
+			#Boundary is insulated
+			dCdt[0][x] = D_3*((C[1][x]-2*C[0][x]+C[1][x])/dy**2+(C[0][x+1]-2*C[0][x]+C[0][x-1])/dx**2)
+			dCdt[0][x] += Beta*(alpha_0+alpha/(1+(B[0][x]/K_2)**n))-Beta*C[0][x]
+			dCdt[ny-1][x] = D_3*((C[ny-2][x]-2*C[ny-1][x]+C[ny-2][x])/dy**2+(C[ny-1][x+1]-2*C[ny-1][x]+C[ny-1][x-1])/dx**2)
+			dCdt[ny-1][x] += Beta*(alpha_0+alpha/(1+(B[ny-1][x]/K_2)**n))-Beta*C[ny-1][x]
+
+		#Corners
+		#A
+		#boundary is insulated
+		dAdt[0][0] = D_1*((A[1][0]-2*A[0][0]+A[1][0])/dy**2+(A[0][1]-2*A[0][0]+A[0][1])/dx**2)
+		dAdt[0][0] += Beta*(alpha_0+alpha/(1+(C[0][0]/K_3)**n))-Beta*A[0][0]
+		dAdt[ny-1][0] = D_1*((A[ny-2][0]-2*A[ny-1][0]+A[ny-2][0])/dy**2+(A[ny-1][1]-2*A[ny-1][0]+A[ny-1][1])/dx**2)
+		dAdt[ny-1][0] += Beta*(alpha_0+alpha/(1+(C[ny-1][0]/K_3)**n))-Beta*A[ny-1][0]
+		dAdt[0][nx-1] = D_1*((A[1][nx-1]-2*A[0][nx-1]+A[1][nx-1])/dy**2+(A[0][nx-2]-2*A[0][nx-1]+A[0][nx-2])/dx**2)
+		dAdt[0][nx-1] += Beta*(alpha_0+alpha/(1+(C[0][nx-1]/K_3)**n))-Beta*A[0][nx-1]
+		dAdt[ny-1][nx-1] =D_1*((A[ny-2][nx-1]-2*A[ny-1][nx-1]+A[ny-2][nx-1])/dy**2+(A[ny-1][nx-2]-2*A[ny-1][nx-1]+A[ny-1][nx-2])/dx**2)
+		dAdt[ny-1][nx-1] += Beta*(alpha_0+alpha/(1+(C[ny-1][nx-1]/K_3)**n))-Beta*A[ny-1][nx-1]
+
+		#B
+		#boundary is insulated
+		dBdt[0][0] = D_2*((B[1][0]-2*B[0][0]+B[1][0])/dy**2+(B[0][1]-2*B[0][0]+B[0][1])/dx**2)
+		dBdt[0][0] += Beta*(alpha_0+alpha/(1+(A[0][0]/K_1)**n))-Beta*B[0][0]
+		dBdt[ny-1][0] = D_2*((B[ny-2][0]-2*B[ny-1][0]+B[ny-2][0])/dy**2+(B[ny-1][1]-2*B[ny-1][0]+B[ny-1][1])/dx**2)
+		dBdt[ny-1][0] += Beta*(alpha_0+alpha/(1+(A[ny-1][0]/K_1)**n))-Beta*B[ny-1][0]
+		dBdt[0][nx-1] = D_2*((B[1][nx-1]-2*B[0][nx-1]+B[1][nx-1])/dy**2+(B[0][nx-2]-2*B[0][nx-1]+B[0][nx-2])/dx**2)
+		dBdt[0][nx-1] += Beta*(alpha_0+alpha/(1+(A[0][nx-1]/K_1)**n))-Beta*B[0][nx-1]
+		dBdt[ny-1][nx-1] =D_2*((B[ny-2][nx-1]-2*B[ny-1][nx-1]+B[ny-2][nx-1])/dy**2+(B[ny-1][nx-2]-2*B[ny-1][nx-1]+B[ny-1][nx-2])/dx**2)
+		dBdt[ny-1][nx-1] += Beta*(alpha_0+alpha/(1+(A[ny-1][nx-1]/K_1)**n))-Beta*B[ny-1][nx-1]
+
+		#C
+		#boundary is insulated
+		dCdt[0][0] = D_3*((C[1][0]-2*C[0][0]+C[1][0])/dy**2+(C[0][1]-2*C[0][0]+C[0][1])/dx**2)
+		dCdt[0][0] += Beta*(alpha_0+alpha/(1+(B[0][0]/K_2)**n))-Beta*C[0][0]
+		dCdt[ny-1][0] = D_3*((C[ny-2][0]-2*C[ny-1][0]+C[ny-2][0])/dy**2+(C[ny-1][1]-2*C[ny-1][0]+C[ny-1][1])/dx**2)
+		dCdt[ny-1][0] += Beta*(alpha_0+alpha/(1+(B[ny-1][0]/K_2)**n))-Beta*C[ny-1][0]
+		dCdt[0][nx-1] = D_3*((C[1][nx-1]-2*C[0][nx-1]+C[1][nx-1])/dy**2+(C[0][nx-2]-2*C[0][nx-1]+C[0][nx-2])/dx**2)
+		dCdt[0][nx-1] += Beta*(alpha_0+alpha/(1+(B[0][nx-1]/K_2)**n))-Beta*C[0][nx-1]
+		dCdt[ny-1][nx-1] =D_3*((C[ny-2][nx-1]-2*C[ny-1][nx-1]+C[ny-2][nx-1])/dy**2+(C[ny-1][nx-2]-2*C[ny-1][nx-1]+C[ny-1][nx-2])/dx**2)
+		dCdt[ny-1][nx-1] += Beta*(alpha_0+alpha/(1+(B[ny-1][nx-1]/K_2)**n))-Beta*C[ny-1][nx-1]
+			
+		A = np.add(A, dAdt*dt)
+		B = np.add(B, dBdt*dt)
+		C = np.add(C, dCdt*dt)
+		integrals[0].append(integrateCartesian(A, dx, dy))
+		integrals[1].append(integrateCartesian(B, dx, dy))
+		integrals[2].append(integrateCartesian(C, dx, dy))
+		#Plotting the simulation to heatmap
+		if j == 45:# == 10 or j == int(len(t)/2)-1 or j == len(t)-1 :# % 10:
+			
+			np.set_printoptions(threshold=sys.maxsize)
+			print A
+			print B
+			print C
+			fig, ax = plt.subplots()
+			c = ax.pcolormesh(X,Y, A, cmap='RdBu_r')
+			ax.set_title('A')
+			ax.axis([dx/2, Lx-dx/2, dy/2, Ly-dy/2])
+			fig.colorbar(c, ax=ax)
+			plt.show()
+			fig, ax = plt.subplots()
+			c = ax.pcolormesh(X,Y, B, cmap='RdBu_r')
+			ax.set_title('B')
+			ax.axis([dx/2, Lx-dx/2, dy/2, Ly-dy/2])
+			fig.colorbar(c, ax=ax)
+			plt.show()
+			fig, ax = plt.subplots()
+			c = ax.pcolormesh(X,Y, C, cmap='RdBu_r')
+			ax.set_title('C')
+			ax.axis([dx/2, Lx-dx/2, dy/2, Ly-dy/2])
+			fig.colorbar(c, ax=ax)
+			plt.show()
+			
+	
+	color = "%06x" % random.randint(0, 0xFFFFFF)
+	plt.plot(t, integrals[0], "#"+str(color), label="A", linewidth=4)
+	color = "%06x" % random.randint(0, 0xFFFFFF)
+	plt.plot(t, integrals[1], "#"+str(color), label="B", linewidth=4)
+	color = "%06x" % random.randint(0, 0xFFFFFF)
+	plt.plot(t, integrals[2], "#"+str(color), label="C", linewidth=4)
+
+	plt.xlabel('Time')
+	plt.ylabel('Quantity')
+	plt.xlim(-0.01)
+	plt.ylim(-0.01)
+	plt.grid()
+	plt.legend(loc='best')
+	plt.show()
+
+matrices = []
+A = np.zeros((numberOfNodes, numberOfNodes))
+B = np.zeros((numberOfNodes, numberOfNodes))
+C = np.zeros((numberOfNodes, numberOfNodes))
+A[24][24] = 0.1
+B[25][25] = 0.1
+C[24][25] = 0.5
+matrices.append(A)
+matrices.append(B)
+matrices.append(C)
+oscillatorModel(length, length, matrices, diffConsts, finalTime)
