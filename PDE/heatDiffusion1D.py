@@ -8,7 +8,7 @@ length = 1
 numberOfNodes = 50
 leftBoundary = 2
 rightBoundary = 2
-finalTime = 60
+finalTime = 30
 
 D0 = np.ones(numberOfNodes)*0.1
 energyS = np.zeros(numberOfNodes)
@@ -839,7 +839,6 @@ def oscillatorModel(lengthX, lengthY, initMatrices, diffCoeffs, finalTime, bound
 #A Beta*(alpha_0+alpha/(1+(C/K_3)**n))-Beta*A 0.1
 #B Beta*(alpha_0+alpha/(1+(A/K_1)**n))-Beta*B 0.1
 #C Beta*(alpha_0+alpha/(1+(B/K_2)**n))-Beta*C 0.5
-#1 100 10000
 	#Running the simulation
 	for j in range(1,len(t)):
 		for i in range(1,ny-1):
@@ -934,12 +933,12 @@ def oscillatorModel(lengthX, lengthY, initMatrices, diffCoeffs, finalTime, bound
 		integrals[1].append(integrateCartesian(B, dx, dy))
 		integrals[2].append(integrateCartesian(C, dx, dy))
 		#Plotting the simulation to heatmap
-		if j == 45:# == 10 or j == int(len(t)/2)-1 or j == len(t)-1 :# % 10:
-			
+		if not j: #== 45:# == 10 or j == int(len(t)/2)-1 or j == len(t)-1 :# % 10:
+			print dt*j
 			np.set_printoptions(threshold=sys.maxsize)
-			print A
-			print B
-			print C
+			#print A
+			#print B
+			#print C
 			fig, ax = plt.subplots()
 			c = ax.pcolormesh(X,Y, A, cmap='RdBu_r')
 			ax.set_title('A')
@@ -975,14 +974,137 @@ def oscillatorModel(lengthX, lengthY, initMatrices, diffCoeffs, finalTime, bound
 	plt.legend(loc='best')
 	plt.show()
 
+def finiteVolumeMethodOscillator(finalTime, arrays, thermalCoeffs, boundaries = [], length = 1):
+	#Getting the parameters
+	L = length
+	nx = len(arrays[0])
+	A = arrays[0]
+	B = arrays[1]
+	C = arrays[2]
+	dx = float(L)/float(nx)
+	x = np.linspace(dx/2, L-dx/2, nx)
+
+	t_final = finalTime
+	D = thermalCoeffs
+	timeSteps = []
+
+	#Calculating suitable dt
+	for d in thermalCoeffs:
+		timeSteps.append(calcTimeStep(dx, float(d)))	
+	dt = min(timeSteps)
+	
+	t = np.arange(0, t_final, dt)
+	dAdt = np.empty(nx)
+	dBdt = np.empty(nx)
+	dCdt = np.empty(nx)
+	list_A = []
+	list_B = []
+	list_C = []
+	#Oscillator parameters
+	K_1 = 1
+	K_2 = 1
+	K_3 = 1
+	#Tunable parameters
+	alpha_0 = 0
+	alpha = 60*(5)
+	Beta = 0.5
+	n = 2.1
+	#Running the simulation
+	for j in range(1,len(t)):
+		for i in range(1,nx-1):
+			#A
+			dAdt[i] = thermalCoeffs[0]*((A[i+1]-2*A[i]+A[i-1])/dx**2)
+#			dAdt[i] += Beta*(alpha_0+alpha/(1+(C[i]/K_3)**n))-Beta*A[i]
+			dAdt[i] += (Beta*(alpha_0+alpha/(1+(C[i]/K_3)**n))-Beta*A[i])/nx
+			#B
+			dBdt[i] = thermalCoeffs[1]*((B[i+1]-2*B[i]+B[i-1])/dx**2)
+#			dBdt[i] += Beta*(alpha_0+alpha/(1+(A[i]/K_1)**n))-Beta*B[i]
+			dBdt[i] += (Beta*(alpha_0+alpha/(1+(A[i]/K_1)**n))-Beta*B[i])/nx
+			#C
+			dCdt[i] = thermalCoeffs[2]*((C[i+1]-2*C[i]+C[i-1])/dx**2)
+#			dCdt[i] += Beta*(alpha_0+alpha/(1+(B[i]/K_2)**n))-Beta*C[i]
+			dCdt[i] += (Beta*(alpha_0+alpha/(1+(B[i]/K_2)**n))-Beta*C[i])/nx
+		#A
+		dAdt[0] = thermalCoeffs[0]*((2*A[1]-2*A[0])/dx**2)
+		dAdt[0] += Beta*(alpha_0+alpha/(1+(C[0]/K_3)**n))-Beta*A[0]
+		#dAdt[0] += (Beta*(alpha_0+alpha/(1+(C[0]/K_3)**n))-Beta*A[0])/nx
+		dAdt[nx-1] = thermalCoeffs[0]*((2*A[nx-2]-2*A[nx-1])/dx**2)
+		dAdt[nx-1] += Beta*(alpha_0+alpha/(1+(C[nx-1]/K_3)**n))-Beta*A[nx-1]
+		#dAdt[nx-1] += (Beta*(alpha_0+alpha/(1+(C[nx-1]/K_3)**n))-Beta*A[nx-1])/nx
+		A += dAdt*dt
+		list_A.append(A.tolist())
+		#B
+		dBdt[0] = thermalCoeffs[1]*((2*B[1]-2*B[0])/dx**2)
+		#dBdt[0] += Beta*(alpha_0+alpha/(1+(A[0]/K_1)**n))-Beta*B[0]
+		dBdt[0] += (Beta*(alpha_0+alpha/(1+(A[0]/K_1)**n))-Beta*B[0])/nx
+		dBdt[nx-1] = thermalCoeffs[1]*((2*B[nx-2]-2*B[nx-1])/dx**2)
+		dBdt[nx-1] += Beta*(alpha_0+alpha/(1+(A[nx-1]/K_1)**n))-Beta*B[nx-1]
+		#dBdt[nx-1] += (Beta*(alpha_0+alpha/(1+(A[nx-1]/K_1)**n))-Beta*B[nx-1])/nx
+		B += dBdt*dt
+		list_B.append(B.tolist())
+		#C
+		dCdt[0] = thermalCoeffs[2]*((2*C[1]-2*C[0])/dx**2)
+		#dCdt[0] += Beta*(alpha_0+alpha/(1+(B[0]/K_2)**n))-Beta*C[0]
+		dCdt[0] += (Beta*(alpha_0+alpha/(1+(B[0]/K_2)**n))-Beta*C[0])/nx
+		dCdt[nx-1] = thermalCoeffs[2]*((2*C[nx-2]-2*C[nx-1])/dx**2)
+		dCdt[nx-1] += Beta*(alpha_0+alpha/(1+(B[nx-1]/K_2)**n))-Beta*C[nx-1]
+		#dCdt[nx-1] += (Beta*(alpha_0+alpha/(1+(B[nx-1]/K_2)**n))-Beta*C[nx-1])/nx
+		C += dCdt*dt
+		list_C.append(C.tolist())
+		
+	
+	#Plotting the simulation to heatmap
+	fig, ax = plt.subplots()
+	c = ax.pcolormesh(x, t, list_A, cmap='RdBu_r')#, vmin=tMin, vmax=tMax)
+	ax.set_title('p_1')
+	ax.axis([dx/2, L-dx/2, 0, t_final])
+	plt.xlabel("x")
+	plt.ylabel("t")
+	fig.colorbar(c, ax=ax)
+	plt.show()	
+
+	#Plotting the simulation to heatmap
+	fig, ax = plt.subplots()
+	c = ax.pcolormesh(x, t, list_B, cmap='RdBu_r')#, vmin=tMin, vmax=tMax)
+	ax.set_title('p_2')
+	ax.axis([dx/2, L-dx/2, 0, t_final])
+	plt.xlabel("x")
+	plt.ylabel("t")
+	fig.colorbar(c, ax=ax)	
+	plt.show()
+	
+	#Plotting the simulation to heatmap
+	fig, ax = plt.subplots()
+	c = ax.pcolormesh(x, t, list_C, cmap='RdBu_r')#, vmin=tMin, vmax=tMax)
+	ax.set_title('p_3')
+	ax.axis([dx/2, L-dx/2, 0, t_final])
+	plt.xlabel("x")
+	plt.ylabel("t")
+	fig.colorbar(c, ax=ax)
+	plt.show()
+
+
 matrices = []
 A = np.zeros((numberOfNodes, numberOfNodes))
 B = np.zeros((numberOfNodes, numberOfNodes))
 C = np.zeros((numberOfNodes, numberOfNodes))
-A[24][24] = 0.1
+A[25][25] = 0.1
 B[25][25] = 0.1
-C[24][25] = 0.5
+C[25][25] = 0.5
 matrices.append(A)
 matrices.append(B)
 matrices.append(C)
-oscillatorModel(length, length, matrices, diffConsts, finalTime)
+finalTime = 20
+#oscillatorModel(length, length, matrices, diffConsts, finalTime)
+array = []
+A = np.zeros(2*numberOfNodes)
+B = np.zeros(2*numberOfNodes)
+C = np.zeros(2*numberOfNodes)
+A[25] = 0.1
+B[25] = 0.1
+C[25] = 0.5
+array.append(A)
+array.append(B)
+array.append(C)
+finalTime = 30
+finiteVolumeMethodOscillator(finalTime, array, diffConsts)
